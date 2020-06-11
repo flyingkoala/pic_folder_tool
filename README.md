@@ -4,4 +4,5 @@
 1.使用github.com/go-ini/ini包绑定ini配置文件  
 2.使用filepath.Walk方法遍历文件夹下的文件  
 3.使用github.com/rwcarlsen/goexif/exif获取图片的exif信息  
-4.io操作
+4.io操作（文件夹操作和文件读写）
+5.获取文件md5值进行重复文件校验

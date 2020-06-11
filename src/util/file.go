@@ -7,13 +7,18 @@
 package util
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"github.com/rwcarlsen/goexif/exif"
+	"io"
+	"io/ioutil"
 	"os"
 	p "path"
 	"strings"
 )
 
+var MD5Map = make(map[string]int)
 var count =0
 //处理文件
 func DealFile(path string, info os.FileInfo, err error) error {
@@ -26,12 +31,28 @@ func DealFile(path string, info os.FileInfo, err error) error {
 			count++
 			tfolder:=fmt.Sprintf("%s\\%s",AppSetting.TargetFolder,photoyear)
 			PathCreate(tfolder)
-			fmt.Println(fmt.Sprintf("序号：%d,拍摄年份：%s, 图片路径：%s,目标路径：%s",count,photoyear,path,tfolder))
+
+			md5str,err:= GetFileMD5(path)
+			if err==nil{
+				//移动文件到对应目录
+				if MD5Map[md5str]!=1{
+					newpath:=tfolder+"\\"+info.Name()
+					err:=os.Rename(path,newpath)
+					if err!=nil{
+						fmt.Println("移动失败",err.Error())
+					}
+					fmt.Println(fmt.Sprintf("序号：%d, md5：%s， 拍摄年份：%s, 图片路径：%s, 目标路径：%s",count,md5str,photoyear,path,tfolder))
+				}
+				//将MD5值写入全局map
+				MD5Map[md5str]=1
+
+
+			}
+
+
 		}
 
 	}
-
-	//fmt.Printf("\n %d path: %s    fileName: %s     ", count, path, info.Name())
 	return nil
 
 }
@@ -70,4 +91,60 @@ func PathCreate(path string)   {
 			fmt.Printf("mkdir failed![%v]\n", err)
 		}
 	}
+}
+// 判断文件是否存在，不存在则创建
+func FileCreate(filepath string)   {
+	file,err:=os.Open(filepath)
+	defer file.Close()
+	if err!=nil && os.IsNotExist(err) {
+		file, _ = os.Create(filepath)
+
+	}
+}
+//读取MD5文本文件内容，将文件中的数据存入全局MD5map中
+func ReadMD5Txt(filepath string)  error  {
+	file,err:=os.Open(filepath)
+	defer file.Close()
+	if err!=nil  {
+		return err
+	}
+	//1、一次性读取文件内容,还有一个 ReadAll的函数，也能读取
+	data, err := ioutil.ReadFile(filepath)
+	if err != nil {
+		return err
+	}
+	md5all:=string(data)
+	md5arr:= strings.Split(md5all,",")
+	for _,v:=range md5arr{
+		if v!=""{
+			MD5Map[v]=1
+		}
+	}
+
+	return nil
+}
+//将图片的md5追加写入到MD5文件中
+func WriteMD5Txt(){
+	//将全局md5值存入md5文件中
+	md5s:=""
+	for k,_:=range MD5Map{
+		md5s=md5s+","+k
+	}
+	file, _ := os.OpenFile(AppSetting.TargetFolder+"\\md5.txt",  os.O_WRONLY | os.O_CREATE | os.O_APPEND , 0666)
+	// 写入文件内容
+	io.WriteString(file, md5s)
+
+}
+
+//获取文件的md5值
+func GetFileMD5(filepath string) (string,error) {
+	file, err := os.Open(filepath)
+	defer file.Close()
+	if err == nil {
+		md5h := md5.New()
+		io.Copy(md5h, file)
+		MD5Str := hex.EncodeToString(md5h.Sum(nil))
+		return MD5Str,nil
+	}
+	return "",err
 }
