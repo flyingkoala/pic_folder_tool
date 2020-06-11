@@ -27,6 +27,9 @@ func DealFile(path string, info os.FileInfo, err error) error {
 	filetype:= strings.ToLower(p.Ext(p.Base(path))) //获取文件的后缀名
 	if filetype!=""{
 		photoyear:=ReadPhotoYear(path)
+		if photoyear==""{
+			photoyear=ReadPhotoYearBasic(path)
+		}
 		if photoyear!=""{
 			count++
 			tfolder:=fmt.Sprintf("%s\\%s",AppSetting.TargetFolder,photoyear)
@@ -42,6 +45,8 @@ func DealFile(path string, info os.FileInfo, err error) error {
 						fmt.Println("移动失败",err.Error())
 					}
 					fmt.Println(fmt.Sprintf("序号：%d, md5：%s， 拍摄年份：%s, 图片路径：%s, 目标路径：%s",count,md5str,photoyear,path,tfolder))
+				}else {
+					fmt.Println("文件已存在目标路径")
 				}
 				//将MD5值写入全局map
 				MD5Map[md5str]=1
@@ -71,15 +76,39 @@ func ReadPhotoYear(filename string) string {
 	}
 
 	shottime, err := x.Get(exif.DateTime)
+	fmt.Println(shottime)
 	if err != nil {
+		fmt.Println(err.Error())
 		return ""
 	}
 
+	fmt.Println(shottime.String())
 	ts:= strings.Split(shottime.String(),":")
 	if len(ts)==0{
 		return ""
 	}
+	if ts[0]=="\"\""{
+		return ""
+	}
+
 	return ts[0][1:5]
+}
+
+//读取图片信息中的创建时间
+func ReadPhotoYearBasic(filename string) string {
+	fileInfo, _ := os.Stat(filename)
+	if fileInfo==nil{
+		return ""
+	}
+	//修改时间
+	modTime := fileInfo.ModTime().Format("2006-01-02 15:04:05")
+	ts:= strings.Split(modTime,"-")
+	if len(ts)==0||fileInfo.IsDir(){
+		return ""
+	}
+	return ts[0]
+
+
 }
 
 // 判断文件夹是否存在，不存在则创建
